@@ -1,65 +1,92 @@
-import Image from "next/image";
+"use client";
+import { useState, useEffect, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 
-export default function Home() {
+function Dashboard() {
+  const searchParams = useSearchParams();
+  const [connectionId, setConnectionId] = useState("");
+  const [data, setData] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
+
+  const workspaceId = process.env.NEXT_PUBLIC_UNIFIED_WORKSPACE_ID;
+
+  useEffect(() => {
+    const id = searchParams.get('id');
+    if (id) {
+      setConnectionId(id);
+      localStorage.setItem('demo_id', id);
+      window.history.replaceState({}, '', window.location.pathname);
+    } else {
+      const saved = localStorage.getItem('demo_id');
+      if (saved) setConnectionId(saved);
+    }
+  }, [searchParams]);
+
+  const startAuth = (integrationId: string) => {
+    if (!workspaceId) {
+      alert("CRITICAL ERROR: Workspace ID is missing from .env.local");
+      return;
+    }
+    const redirect = window.location.origin;
+    // This URL bypasses the component and opens the auth directly
+    const url = `https://api.unified.to/unified/integration/auth/${workspaceId}/${integrationId}?redirect=true&success_redirect=${redirect}`;
+    window.location.href = url;
+  };
+
+  const fetchData = async (cat: string, end: string) => {
+    setLoading(true);
+    const res = await fetch(`/api/unified?connectionId=${connectionId}&category=${cat}&endpoint=${end}`);
+    const json = await res.json();
+    setData(json);
+    setLoading(false);
+  };
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+    <div className="p-10 max-w-4xl mx-auto font-sans">
+      <h1 className="text-3xl font-bold mb-4">Unified Demo (Direct Auth)</h1>
+
+      {/* DEBUG BOX */}
+      {!workspaceId && (
+        <div className="p-4 bg-red-100 text-red-700 border-2 border-red-500 mb-6 rounded-lg">
+          <strong>Error:</strong> NEXT_PUBLIC_UNIFIED_WORKSPACE_ID is not set in .env.local
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+      )}
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+        {/* STEP 1 */}
+        <div className="p-6 border-4 border-black rounded-2xl shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] bg-white">
+          <h2 className="font-bold uppercase mb-4">1. Connect Platform</h2>
+          <div className="flex flex-col gap-2">
+            <button onClick={() => startAuth('shopify')} className="w-full py-3 bg-[#95BF47] text-white font-bold rounded-xl border-2 border-black">Connect Shopify</button>
+            <button onClick={() => startAuth('tiktok')} className="w-full py-3 bg-black text-white font-bold rounded-xl border-2 border-black">Connect TikTok</button>
+          </div>
+
+          <div className="mt-6 p-3 bg-slate-100 rounded-lg border-2 border-black overflow-hidden">
+            <p className="text-[10px] uppercase font-bold text-slate-500">Active Connection:</p>
+            <p className="text-[11px] font-mono break-all">{connectionId || "None"}</p>
+          </div>
         </div>
-      </main>
+
+        {/* STEP 2 */}
+        <div className="space-y-4">
+          <h2 className="font-bold uppercase">2. Fetch Data</h2>
+          <button
+            disabled={!connectionId}
+            onClick={() => fetchData('commerce', 'item')}
+            className="w-full py-4 border-4 border-black rounded-2xl font-black text-lg hover:bg-yellow-400 transition-colors disabled:opacity-20"
+          >
+            📦 GET PRODUCTS
+          </button>
+
+          <div className="bg-slate-900 rounded-2xl p-4 h-64 overflow-auto border-4 border-black text-green-400 font-mono text-[10px]">
+            {loading ? "SYNCING..." : <pre>{JSON.stringify(data || "// Ready", null, 2)}</pre>}
+          </div>
+        </div>
+      </div>
     </div>
   );
+}
+
+export default function App() {
+  return <Suspense><Dashboard /></Suspense>;
 }
