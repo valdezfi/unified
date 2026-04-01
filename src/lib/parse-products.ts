@@ -2,6 +2,9 @@ export type DisplayProduct = {
   id: string;
   title: string;
   imageUrl: string | null;
+  productUrl: string | null;
+  slug: string | null;
+  description: string | null;
   priceLabel: string;
   /** rough hint for optional badge */
   inventoryHint?: number | null;
@@ -93,6 +96,58 @@ function pickInventory(item: Record<string, unknown>): number | null {
   return null;
 }
 
+function pickDescription(item: Record<string, unknown>): string | null {
+  const direct =
+    pickString(item.description) ??
+    pickString(item.body_html) ??
+    pickString(item.bodyHtml);
+  if (direct) return direct;
+
+  const raw = item.raw;
+  if (raw && typeof raw === "object") {
+    const r = raw as Record<string, unknown>;
+    return (
+      pickString(r.description) ??
+      pickString(r.body_html) ??
+      pickString(r.bodyHtml) ??
+      null
+    );
+  }
+  return null;
+}
+
+function pickProductUrl(item: Record<string, unknown>): string | null {
+  const direct =
+    pickString(item.online_store_url) ??
+    pickString(item.productUrl) ??
+    pickString(item.url);
+  if (direct) return direct;
+
+  const raw = item.raw;
+  if (raw && typeof raw === "object") {
+    const r = raw as Record<string, unknown>;
+    return (
+      pickString(r.online_store_url) ??
+      pickString(r.productUrl) ??
+      pickString(r.url) ??
+      null
+    );
+  }
+  return null;
+}
+
+function pickSlug(item: Record<string, unknown>): string | null {
+  const direct = pickString(item.slug) ?? pickString(item.handle);
+  if (direct) return direct;
+
+  const raw = item.raw;
+  if (raw && typeof raw === "object") {
+    const r = raw as Record<string, unknown>;
+    return pickString(r.slug) ?? pickString(r.handle) ?? null;
+  }
+  return null;
+}
+
 export function parseCommerceItemsPayload(data: unknown): DisplayProduct[] {
   if (!data || typeof data !== "object") return [];
   const err = (data as Record<string, unknown>).error;
@@ -115,6 +170,9 @@ export function parseCommerceItemsPayload(data: unknown): DisplayProduct[] {
         id,
         title,
         imageUrl: pickImage(item),
+        productUrl: pickProductUrl(item),
+        slug: pickSlug(item),
+        description: pickDescription(item),
         priceLabel: pickPrice(item),
         inventoryHint: pickInventory(item),
       };

@@ -4,6 +4,7 @@ type Props = {
   product: DisplayProduct;
   index: number;
   onPromote?: (product: DisplayProduct) => void;
+  promoting?: boolean;
 };
 
 function badgeFor(product: DisplayProduct, index: number): string | null {
@@ -15,7 +16,7 @@ function badgeFor(product: DisplayProduct, index: number): string | null {
   return null;
 }
 
-export function ProductCard({ product, index, onPromote }: Props) {
+export function ProductCard({ product, index, onPromote, promoting = false }: Props) {
   const badge = badgeFor(product, index);
   const imageSrc = product.imageUrl?.trim() || "/product2.jpg";
 
@@ -41,10 +42,11 @@ export function ProductCard({ product, index, onPromote }: Props) {
         <p className="font-sans text-sm text-[#1A1A1A]/70">{product.priceLabel}</p>
         <button
           type="button"
+          disabled={promoting}
           onClick={() => onPromote?.(product)}
-          className="mt-auto inline-flex items-center justify-center rounded-full border border-[#1A1A1A] bg-transparent px-4 py-2.5 font-sans text-sm font-medium text-[#1A1A1A] transition-colors hover:bg-[#1A1A1A] hover:text-[#FAF9F6]"
+          className="mt-auto inline-flex items-center justify-center rounded-full border border-[#1A1A1A] bg-transparent px-4 py-2.5 font-sans text-sm font-medium text-[#1A1A1A] transition-colors hover:bg-[#1A1A1A] hover:text-[#FAF9F6] disabled:cursor-not-allowed disabled:opacity-60"
         >
-          Promote ↗
+          {promoting ? "Promoting..." : "Promote ↗"}
         </button>
       </div>
     </article>

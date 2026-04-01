@@ -38,6 +38,8 @@ export function ProductSection({ connectionId }: Props) {
   const [products, setProducts] = useState<DisplayProduct[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [promotingId, setPromotingId] = useState<string | null>(null);
+  const [promoteMsg, setPromoteMsg] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -67,6 +69,37 @@ export function ProductSection({ connectionId }: Props) {
     void load();
   }, [load]);
 
+  const handlePromote = useCallback(async (product: DisplayProduct) => {
+    setPromotingId(product.id);
+    setPromoteMsg(null);
+    try {
+      const res = await fetch("/api/promote", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          product: {
+            id: product.id,
+            title: product.title,
+            imageUrl: product.imageUrl,
+            productUrl: product.productUrl,
+            slug: product.slug,
+            description: product.description,
+          },
+        }),
+      });
+      const json = (await res.json()) as { error?: string; adId?: string };
+      if (!res.ok) {
+        throw new Error(json.error ?? "Failed to promote product");
+      }
+      setPromoteMsg(`Ad created in paused state${json.adId ? ` (id: ${json.adId})` : ""}.`);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Failed to promote product";
+      setPromoteMsg(msg);
+    } finally {
+      setPromotingId(null);
+    }
+  }, []);
+
   return (
     <motion.div
       className="bg-[#FAF9F6]"
@@ -86,6 +119,9 @@ export function ProductSection({ connectionId }: Props) {
       </motion.section>
 
       <main className="px-6 py-10 md:px-10 md:py-12">
+        {promoteMsg ? (
+          <p className="mb-4 font-sans text-sm text-[#1A1A1A]/80">{promoteMsg}</p>
+        ) : null}
         {loading ? (
           <p className="font-sans text-sm text-[#1A1A1A]/60">Loading products…</p>
         ) : error ? (
@@ -106,8 +142,8 @@ export function ProductSection({ connectionId }: Props) {
                 <ProductCard
                   product={p}
                   index={i}
-                  onPromote={() => {
-                  }}
+                  promoting={promotingId === p.id}
+                  onPromote={handlePromote}
                 />
               </motion.div>
             ))}
