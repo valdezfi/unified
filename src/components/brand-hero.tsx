@@ -8,9 +8,10 @@ type Platform = "shopify" | "woocommerce";
 type Props = {
   onConnect: (platform: Platform) => void;
   workspaceReady: boolean;
+  isConnected: boolean;
 };
 
-export function BrandHero({ onConnect, workspaceReady }: Props) {
+export function BrandHero({ onConnect, workspaceReady, isConnected }: Props) {
   const [selectedPlatform, setSelectedPlatform] = useState<Platform>("shopify");
 
   return (
@@ -41,6 +42,13 @@ export function BrandHero({ onConnect, workspaceReady }: Props) {
                 </code>{" "}
                 to your environment to enable connection.
               </p>
+            ) : isConnected ? (
+              <div className="flex w-full flex-col gap-4">
+                <p className="font-sans text-sm text-[#1A1A1A]/80">Your store is already connected.</p>
+                <p className="rounded border border-[#1A1A1A]/20 bg-[#1A1A1A]/5 px-4 py-3 text-sm text-[#1A1A1A]/85">
+                  Use the refresh button in the Inventory section to reload products.
+                </p>
+              </div>
             ) : (
               <div className="flex w-full flex-col gap-4">
                 <p className="font-sans text-sm text-[#1A1A1A]/80">Choose your platform:</p>
@@ -52,6 +60,7 @@ export function BrandHero({ onConnect, workspaceReady }: Props) {
                       value="shopify"
                       checked={selectedPlatform === "shopify"}
                       onChange={(e) => setSelectedPlatform(e.target.value as Platform)}
+                      disabled={isConnected}
                       className="w-4 h-4 text-[#1A1A1A] border-[#1A1A1A]/30 focus:ring-[#1A1A1A]/50"
                     />
                     <span className="font-sans text-sm text-[#1A1A1A]">Shopify</span>
@@ -63,6 +72,7 @@ export function BrandHero({ onConnect, workspaceReady }: Props) {
                       value="woocommerce"
                       checked={selectedPlatform === "woocommerce"}
                       onChange={(e) => setSelectedPlatform(e.target.value as Platform)}
+                      disabled={isConnected}
                       className="w-4 h-4 text-[#1A1A1A] border-[#1A1A1A]/30 focus:ring-[#1A1A1A]/50"
                     />
                     <span className="font-sans text-sm text-[#1A1A1A]">WooCommerce</span>
@@ -73,10 +83,10 @@ export function BrandHero({ onConnect, workspaceReady }: Props) {
             <button
               type="button"
               onClick={() => onConnect(selectedPlatform)}
-              disabled={!workspaceReady}
+              disabled={!workspaceReady || isConnected}
               className="inline-flex items-center justify-center rounded-full border border-[#1A1A1A] bg-[#FAF9F6]/95 px-10 py-3.5 font-sans text-base font-medium text-[#1A1A1A] transition-colors enabled:hover:bg-[#1A1A1A] enabled:hover:text-[#FAF9F6] disabled:cursor-not-allowed disabled:opacity-40"
             >
-              Connect Store ↗
+              {isConnected ? "Connected" : "Connect Store ↗"}
             </button>
           </div>
         </div>

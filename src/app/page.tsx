@@ -38,6 +38,7 @@ function HomeContent() {
       <BrandHero
         onConnect={startAuth}
         workspaceReady={Boolean(workspaceId)}
+        isConnected={Boolean(connectionId)}
       />
       {connectionId ? <ProductSection connectionId={connectionId} /> : null}
     </div>
