@@ -107,6 +107,7 @@ export function ProductSection({ connectionId }: Props) {
                   product={p}
                   index={i}
                   onPromote={() => {
+                    alert('will promote to marketing platform (not implemented in demo)');
                   }}
                 />
               </motion.div>
