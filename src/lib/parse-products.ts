@@ -5,6 +5,8 @@ export type DisplayProduct = {
   productUrl: string | null;
   slug: string | null;
   description: string | null;
+  youtubeUrl: string | null;
+  youtubeVideoId: string | null;
   priceLabel: string;
   /** rough hint for optional badge */
   inventoryHint?: number | null;
@@ -148,6 +150,100 @@ function pickSlug(item: Record<string, unknown>): string | null {
   return null;
 }
 
+function pickYouTubeUrl(item: Record<string, unknown>): string | null {
+  const direct =
+    pickString(item.youtube_url) ??
+    pickString(item.youtubeUrl) ??
+    pickString(item.youtube_video_url) ??
+    pickString(item.youtubeVideoUrl) ??
+    pickString(item.video_url) ??
+    pickString(item.videoUrl) ??
+    pickString(item.external_video_url) ??
+    pickString(item.externalVideoUrl);
+
+  if (direct) return direct;
+
+  const media = item.media;
+  if (Array.isArray(media)) {
+    for (const node of media) {
+      if (!node || typeof node !== "object") continue;
+      const m = node as Record<string, unknown>;
+
+      const embedded =
+        pickString(m.embeddedUrl) ??
+        pickString(m.embedded_url) ??
+        pickString(m.embedUrl) ??
+        pickString(m.embed_url);
+      if (embedded && /youtube\.com|youtu\.be/i.test(embedded)) return embedded;
+
+      const maybeUrl =
+        pickString(m.url) ??
+        pickString(m.src) ??
+        pickString(m.externalUrl) ??
+        pickString(m.external_url);
+      if (maybeUrl && /youtube\.com|youtu\.be/i.test(maybeUrl)) return maybeUrl;
+
+      const host = pickString(m.host);
+      if (host && /youtube\.com|youtu\.be/i.test(host)) {
+        const hostedUrl =
+          pickString(m.url) ??
+          pickString(m.src) ??
+          pickString(m.externalUrl) ??
+          pickString(m.external_url);
+        if (hostedUrl) return hostedUrl;
+      }
+    }
+  }
+
+  const raw = item.raw;
+  if (raw && typeof raw === "object") {
+    const r = raw as Record<string, unknown>;
+    const rawDirect =
+      pickString(r.youtube_url) ??
+      pickString(r.youtubeUrl) ??
+      pickString(r.youtube_video_url) ??
+      pickString(r.youtubeVideoUrl);
+    if (rawDirect) return rawDirect;
+
+    const rawMedia = r.media;
+    if (Array.isArray(rawMedia)) {
+      for (const node of rawMedia) {
+        if (!node || typeof node !== "object") continue;
+        const m = node as Record<string, unknown>;
+        const embedded =
+          pickString(m.embeddedUrl) ??
+          pickString(m.embedded_url) ??
+          pickString(m.embedUrl) ??
+          pickString(m.embed_url);
+        if (embedded && /youtube\.com|youtu\.be/i.test(embedded)) return embedded;
+
+        const maybeUrl =
+          pickString(m.url) ??
+          pickString(m.src) ??
+          pickString(m.externalUrl) ??
+          pickString(m.external_url);
+        if (maybeUrl && /youtube\.com|youtu\.be/i.test(maybeUrl)) return maybeUrl;
+      }
+    }
+  }
+
+  return null;
+}
+
+function pickYouTubeVideoIdFromUrl(url: string): string | null {
+  const trimmed = url.trim();
+  if (!trimmed) return null;
+
+  if (/^[A-Za-z0-9_-]{11}$/.test(trimmed)) return trimmed;
+
+  const match =
+    trimmed.match(
+      /(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|shorts\/|live\/))([A-Za-z0-9_-]{11})/,
+    ) ?? trimmed.match(/[?&]v=([A-Za-z0-9_-]{11})/);
+
+  return match?.[1] ?? null;
+}
+
 export function parseCommerceItemsPayload(data: unknown): DisplayProduct[] {
   if (!data || typeof data !== "object") return [];
   const err = (data as Record<string, unknown>).error;
@@ -173,6 +269,11 @@ export function parseCommerceItemsPayload(data: unknown): DisplayProduct[] {
         productUrl: pickProductUrl(item),
         slug: pickSlug(item),
         description: pickDescription(item),
+        youtubeUrl: pickYouTubeUrl(item),
+        youtubeVideoId: (() => {
+          const u = pickYouTubeUrl(item);
+          return u ? pickYouTubeVideoIdFromUrl(u) : null;
+        })(),
         priceLabel: pickPrice(item),
         inventoryHint: pickInventory(item),
       };

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { ProductCard } from "@/components/product-card";
+import { PromoteModal } from "@/components/promote-modal";
 import {
   parseCommerceItemsPayload,
   type DisplayProduct,
@@ -38,8 +39,26 @@ export function ProductSection({ connectionId }: Props) {
   const [products, setProducts] = useState<DisplayProduct[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [promotingId, setPromotingId] = useState<string | null>(null);
   const [promoteMsg, setPromoteMsg] = useState<string | null>(null);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState<DisplayProduct | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  type YouTubePayload = {
+    videoUrl: string;
+    headline: string;
+    longHeadline: string;
+    dailyBudget: number;
+    durationDays: number;
+    country: string;
+    interests: string[];
+  };
+
+  type SubmitInput = {
+    meta: boolean;
+    youtube: boolean;
+    youtubePayload?: YouTubePayload;
+  };
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -69,36 +88,100 @@ export function ProductSection({ connectionId }: Props) {
     void load();
   }, [load]);
 
-  const handlePromote = useCallback(async (product: DisplayProduct) => {
-    setPromotingId(product.id);
-    setPromoteMsg(null);
-    try {
+  const handleModalSubmit = useCallback(async (input: SubmitInput) => {
+      if (!selectedProduct) return;
+      setSubmitting(true);
+      setPromoteMsg(null);
+
+    const messages: string[] = [];
+    const errors: string[] = [];
+
+    const runMeta = async () => {
       const res = await fetch("/api/promote", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           product: {
-            id: product.id,
-            title: product.title,
-            imageUrl: product.imageUrl,
-            productUrl: product.productUrl,
-            slug: product.slug,
-            description: product.description,
+            id: selectedProduct.id,
+            title: selectedProduct.title,
+            imageUrl: selectedProduct.imageUrl,
+            productUrl: selectedProduct.productUrl,
+            slug: selectedProduct.slug,
+            description: selectedProduct.description,
           },
         }),
       });
       const json = (await res.json()) as { error?: string; adId?: string };
       if (!res.ok) {
-        throw new Error(json.error ?? "Failed to promote product");
+        throw new Error(json.error ?? "Failed to promote to Meta");
       }
-      setPromoteMsg(`Ad created in paused state${json.adId ? ` (id: ${json.adId})` : ""}.`);
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "Failed to promote product";
-      setPromoteMsg(msg);
+      messages.push(
+        `Meta campaign created in paused state${json.adId ? ` (id: ${json.adId})` : ""}.`,
+      );
+    };
+
+    const runYouTube = async () => {
+      const res = await fetch("/api/promote/youtube", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          product: {
+            id: selectedProduct.id,
+            title: selectedProduct.title,
+            imageUrl: selectedProduct.imageUrl,
+            productUrl: selectedProduct.productUrl,
+            slug: selectedProduct.slug,
+            description: selectedProduct.description,
+          },
+          youtubePayload: input.youtubePayload,
+        }),
+      });
+      const json = (await res.json()) as {
+        error?: string;
+        youtubeVideoId?: string;
+        status?: string;
+      };
+      if (!res.ok) {
+        throw new Error(json.error ?? "Failed to promote to YouTube");
+      }
+      messages.push(
+        `YouTube campaign queued${json.youtubeVideoId ? ` (video: ${json.youtubeVideoId})` : ""}.`,
+      );
+    };
+
+    try {
+      if (input.meta) {
+        try {
+          await runMeta();
+        } catch (err) {
+          errors.push(`Meta: ${err instanceof Error ? err.message : "Unknown error"}`);
+        }
+      }
+
+      if (input.youtube) {
+        try {
+          await runYouTube();
+        } catch (err) {
+          errors.push(
+            `YouTube: ${err instanceof Error ? err.message : "Unknown error"}`,
+          );
+        }
+      }
+
+      setPromoteMsg([...messages, ...errors].join(" "));
+
+      // Close the modal only if all selected channels succeeded.
+      const anySelected = input.meta || input.youtube;
+      const allSucceeded =
+        anySelected && errors.length === 0 && messages.length > 0;
+      if (allSucceeded) {
+        setModalOpen(false);
+        setSelectedProduct(null);
+      }
     } finally {
-      setPromotingId(null);
+      setSubmitting(false);
     }
-  }, []);
+    }, [selectedProduct]);
 
   return (
     <motion.div
@@ -142,14 +225,35 @@ export function ProductSection({ connectionId }: Props) {
                 <ProductCard
                   product={p}
                   index={i}
-                  promoting={promotingId === p.id}
-                  onPromote={handlePromote}
+                  promoting={modalOpen || submitting}
+                  onPromote={(prod) => {
+                    setSelectedProduct(prod);
+                    setModalOpen(true);
+                  }}
                 />
               </motion.div>
             ))}
           </motion.div>
         )}
       </main>
+
+      {modalOpen && selectedProduct ? (
+        <PromoteModal
+          product={selectedProduct}
+          defaultMetaSelected={true}
+          defaultYouTubeSelected={Boolean(
+            selectedProduct.youtubeUrl || selectedProduct.youtubeVideoId,
+          )}
+          submitting={submitting}
+          onClose={() => {
+            if (submitting) return;
+            setModalOpen(false);
+            setSelectedProduct(null);
+          }}
+          onSubmit={handleModalSubmit}
+        />
+      ) : null}
     </motion.div>
   );
 }
+
