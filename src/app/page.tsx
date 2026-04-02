@@ -16,6 +16,7 @@ function HomeContent() {
     const id = searchParams.get("id");
     if (id) {
       setConnectionId(id);
+      console.log("Received connection ID from URL:", id);
       localStorage.setItem("demo_id", id);
       window.history.replaceState({}, "", window.location.pathname);
       return;
@@ -24,19 +25,25 @@ function HomeContent() {
     setConnectionId(saved ?? "");
   }, [searchParams]);
 
-  const startAuth = () => {
+  const startAuth = (platform: "shopify" | "woocommerce") => {
     if (!workspaceId) return;
     const redirect = window.location.origin;
-    const url = `https://api.unified.to/unified/integration/auth/${workspaceId}/shopify?redirect=true&success_redirect=${encodeURIComponent(redirect)}`;
+    const url = `https://api.unified.to/unified/integration/auth/${workspaceId}/${platform}?redirect=true&success_redirect=${encodeURIComponent(redirect)}`;
     window.location.href = url;
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem("demo_id");
+    setConnectionId(null);
   };
 
   return (
     <div className="min-h-screen bg-[#FAF9F6]">
-      <StoreNav connectionId={connectionId || undefined} />
+      <StoreNav connectionId={connectionId || undefined} onLogout={handleLogout} />
       <BrandHero
         onConnect={startAuth}
         workspaceReady={Boolean(workspaceId)}
+        isConnected={Boolean(connectionId)}
       />
       {connectionId ? <ProductSection connectionId={connectionId} /> : null}
     </div>

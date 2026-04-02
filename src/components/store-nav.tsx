@@ -1,5 +1,6 @@
 type Props = {
   connectionId?: string;
+  onLogout?: () => void;
 };
 
 function shortId(id: string, max = 10) {
@@ -7,7 +8,7 @@ function shortId(id: string, max = 10) {
   return `${id.slice(0, max)}…`;
 }
 
-export function StoreNav({ connectionId }: Props) {
+export function StoreNav({ connectionId, onLogout }: Props) {
   const connected = Boolean(connectionId);
 
   return (
@@ -16,11 +17,20 @@ export function StoreNav({ connectionId }: Props) {
         Store
       </div>
       {connected && connectionId ? (
-        <div className="rounded-full border border-[#1A1A1A]/20 bg-[#FAF9F6] px-3 py-1.5 font-sans text-xs text-[#1A1A1A]/75">
-          Store Connected{" "}
-          <span className="font-medium text-[#1A1A1A]">
-            (ID: {shortId(connectionId)})
-          </span>
+        <div className="flex items-center gap-3">
+          <div className="rounded-full border border-[#1A1A1A]/20 bg-[#FAF9F6] px-3 py-1.5 font-sans text-xs text-[#1A1A1A]/75">
+            Store Connected{" "}
+            <span className="font-medium text-[#1A1A1A]">
+              (ID: {shortId(connectionId)})
+            </span>
+          </div>
+          <button
+            onClick={onLogout}
+            className="rounded-full border border-[#1A1A1A]/20 bg-[#FAF9F6] px-3 py-1.5 font-sans text-xs text-[#1A1A1A] transition-colors hover:bg-[#1A1A1A]/5 active:bg-[#1A1A1A]/10"
+            aria-label="Logout"
+          >
+            Logout
+          </button>
         </div>
       ) : (
         <div className="font-sans text-xs text-[#1A1A1A]/40" aria-hidden="true">
