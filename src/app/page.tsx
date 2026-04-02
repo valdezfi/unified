@@ -32,9 +32,14 @@ function HomeContent() {
     window.location.href = url;
   };
 
+  const handleLogout = () => {
+    localStorage.removeItem("demo_id");
+    setConnectionId(null);
+  };
+
   return (
     <div className="min-h-screen bg-[#FAF9F6]">
-      <StoreNav connectionId={connectionId || undefined} />
+      <StoreNav connectionId={connectionId || undefined} onLogout={handleLogout} />
       <BrandHero
         onConnect={startAuth}
         workspaceReady={Boolean(workspaceId)}

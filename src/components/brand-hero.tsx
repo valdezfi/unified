@@ -16,7 +16,7 @@ export function BrandHero({ onConnect, workspaceReady, isConnected }: Props) {
 
   return (
     <div className="flex min-h-screen flex-col md:flex-row">
-      <section className="flex flex-1 flex-col justify-center gap-6 bg-[#E4F9A0] px-8 py-16 md:px-14 md:py-20">
+      <section className="flex flex-1 flex-col justify-center gap-6 bg-[#E4F9A0] px-8 py-8 md:px-14 md:py-12">
         <h1 className="max-w-xl font-serif text-4xl leading-[1.1] text-[#1A1A1A] md:text-5xl lg:text-[3.25rem]">
           Manage Your <em className="italic">Glowly</em> Store.
         </h1>
