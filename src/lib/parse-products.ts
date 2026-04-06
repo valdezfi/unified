@@ -2,6 +2,8 @@ export type DisplayProduct = {
   id: string;
   title: string;
   imageUrl: string | null;
+  /** Direct URL to a product video file (e.g. Shopify hosted .mp4), for TikTok upload */
+  productVideoUrl: string | null;
   productUrl: string | null;
   slug: string | null;
   description: string | null;
@@ -150,6 +152,62 @@ function pickSlug(item: Record<string, unknown>): string | null {
   return null;
 }
 
+function isLikelyDirectVideoUrl(url: string): boolean {
+  const u = url.toLowerCase();
+  if (u.includes("youtube.com") || u.includes("youtu.be")) return false;
+  return /\.(mp4|mov|webm|m4v)(\?|$)/i.test(u);
+}
+
+function pickProductVideoUrl(item: Record<string, unknown>): string | null {
+  const fromFields =
+    pickString(item.product_video_url) ??
+    pickString(item.productVideoUrl) ??
+    pickString(item.video_url) ??
+    pickString(item.videoUrl);
+  if (fromFields && isLikelyDirectVideoUrl(fromFields)) return fromFields;
+
+  const scanMedia = (nodes: unknown): string | null => {
+    if (!Array.isArray(nodes)) return null;
+    for (const node of nodes) {
+      if (!node || typeof node !== "object") continue;
+      const m = node as Record<string, unknown>;
+      const mime =
+        pickString(m.mime_type) ??
+        pickString(m.mimeType) ??
+        pickString(m.content_type);
+      const url =
+        pickString(m.url) ?? pickString(m.src) ?? pickString(m.originalSource);
+      if (mime?.startsWith("video/") && url) return url;
+      if (url && isLikelyDirectVideoUrl(url)) return url;
+      const variants = m.sources;
+      if (Array.isArray(variants)) {
+        for (const s of variants) {
+          if (!s || typeof s !== "object") continue;
+          const u = pickString((s as Record<string, unknown>).url);
+          if (u && isLikelyDirectVideoUrl(u)) return u;
+        }
+      }
+    }
+    return null;
+  };
+
+  const mediaHit = scanMedia(item.media);
+  if (mediaHit) return mediaHit;
+
+  const raw = item.raw;
+  if (raw && typeof raw === "object") {
+    const r = raw as Record<string, unknown>;
+    const rawDirect =
+      pickString(r.product_video_url) ??
+      pickString(r.productVideoUrl);
+    if (rawDirect && isLikelyDirectVideoUrl(rawDirect)) return rawDirect;
+    const rawMedia = scanMedia(r.media);
+    if (rawMedia) return rawMedia;
+  }
+
+  return null;
+}
+
 function pickYouTubeUrl(item: Record<string, unknown>): string | null {
   const direct =
     pickString(item.youtube_url) ??
@@ -266,6 +324,7 @@ export function parseCommerceItemsPayload(data: unknown): DisplayProduct[] {
         id,
         title,
         imageUrl: pickImage(item),
+        productVideoUrl: pickProductVideoUrl(item),
         productUrl: pickProductUrl(item),
         slug: pickSlug(item),
         description: pickDescription(item),

@@ -16,7 +16,12 @@ function badgeFor(product: DisplayProduct, index: number): string | null {
   return null;
 }
 
-export function ProductCard({ product, index, onPromote, promoting = false }: Props) {
+export function ProductCard({
+  product,
+  index,
+  onPromote,
+  promoting = false,
+}: Props) {
   const badge = badgeFor(product, index);
   const imageSrc = product.imageUrl?.trim() || "/product2.jpg";
 

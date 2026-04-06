@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Facebook, Youtube, X } from "lucide-react";
+import { Clapperboard, Facebook, Video, X, Youtube } from "lucide-react";
 import type { DisplayProduct } from "@/lib/parse-products";
 
 type YouTubePayload = {
@@ -14,15 +14,26 @@ type YouTubePayload = {
   interests: string[];
 };
 
+type TikTokPayload = {
+  dailyBudget: number;
+  durationDays: number;
+  country: string;
+  adText?: string;
+};
+
 type Props = {
   product: DisplayProduct;
   defaultMetaSelected: boolean;
   defaultYouTubeSelected: boolean;
+  defaultTikTokSelected?: boolean;
+  tikTokLinked: boolean;
   onClose: () => void;
   onSubmit: (input: {
     meta: boolean;
     youtube: boolean;
+    tikTok: boolean;
     youtubePayload?: YouTubePayload;
+    tiktokPayload?: TikTokPayload;
   }) => Promise<void>;
   submitting?: boolean;
 };
@@ -39,6 +50,8 @@ export function PromoteModal({
   product,
   defaultMetaSelected,
   defaultYouTubeSelected,
+  defaultTikTokSelected = false,
+  tikTokLinked,
   onClose,
   onSubmit,
   submitting = false,
@@ -47,6 +60,7 @@ export function PromoteModal({
 
   const [metaEnabled, setMetaEnabled] = useState(defaultMetaSelected);
   const [youtubeEnabled, setYouTubeEnabled] = useState(defaultYouTubeSelected);
+  const [tikTokEnabled, setTikTokEnabled] = useState(defaultTikTokSelected);
 
   const [videoMode, setVideoMode] = useState<"existing" | "paste">(
     existingYouTubeUrl ? "existing" : "paste",
@@ -59,12 +73,14 @@ export function PromoteModal({
   const [durationDays, setDurationDays] = useState<number>(7);
   const [country, setCountry] = useState<string>("US");
   const [interests, setInterests] = useState<string[]>([]);
+  const [tikTokAdText, setTikTokAdText] = useState("");
 
   const [formError, setFormError] = useState<string | null>(null);
 
   useEffect(() => {
     setMetaEnabled(defaultMetaSelected);
     setYouTubeEnabled(defaultYouTubeSelected);
+    setTikTokEnabled(defaultTikTokSelected);
     setVideoMode(existingYouTubeUrl ? "existing" : "paste");
     setPastedVideoUrl(existingYouTubeUrl ?? "");
     setHeadline("");
@@ -73,6 +89,7 @@ export function PromoteModal({
     setDurationDays(7);
     setCountry("US");
     setInterests([]);
+    setTikTokAdText("");
     setFormError(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [product.id]);
@@ -86,9 +103,31 @@ export function PromoteModal({
   const validate = () => {
     setFormError(null);
 
-    if (!metaEnabled && !youtubeEnabled) {
-      setFormError("Select at least one channel: Meta or YouTube.");
+    if (!metaEnabled && !youtubeEnabled && !tikTokEnabled) {
+      setFormError("Select at least one channel: Meta, YouTube, or TikTok.");
       return false;
+    }
+
+    if (tikTokEnabled) {
+      if (!product.productVideoUrl?.trim()) {
+        setFormError(
+          "This product needs a hosted video URL (e.g. Shopify .mp4) for TikTok. YouTube links cannot be used as the direct upload source.",
+        );
+        return false;
+      }
+      if (!Number.isFinite(dailyBudget) || dailyBudget <= 0) {
+        setFormError("Daily budget must be greater than 0.");
+        return false;
+      }
+      if (!Number.isFinite(durationDays) || durationDays <= 0) {
+        setFormError("Duration (days) must be greater than 0.");
+        return false;
+      }
+      const c = country.trim();
+      if (!c) {
+        setFormError("Country / region is required for TikTok targeting.");
+        return false;
+      }
     }
 
     if (youtubeEnabled) {
@@ -122,17 +161,27 @@ export function PromoteModal({
         setFormError("Duration (days) must be greater than 0.");
         return false;
       }
+      const c = country.trim();
+      if (!c) {
+        setFormError("Country / region is required.");
+        return false;
+      }
     }
 
     return true;
   };
 
   const onLaunch = async () => {
+    if (tikTokEnabled && !tikTokLinked) {
+      window.location.href = "/api/auth/tiktok";
+      return;
+    }
     if (!validate()) return;
 
     await onSubmit({
       meta: metaEnabled,
       youtube: youtubeEnabled,
+      tikTok: tikTokEnabled,
       youtubePayload: youtubeEnabled
         ? {
             videoUrl: finalVideoUrl.trim(),
@@ -142,6 +191,16 @@ export function PromoteModal({
             durationDays,
             country: country.trim() || "US",
             interests,
+          }
+        : undefined,
+      tiktokPayload: tikTokEnabled
+        ? {
+            dailyBudget,
+            durationDays,
+            country: country.trim() || "US",
+            adText: tikTokAdText.trim()
+              ? clampText(tikTokAdText, 100)
+              : undefined,
           }
         : undefined,
     });
@@ -201,6 +260,35 @@ export function PromoteModal({
                 <Youtube size={16} />
                 YouTube
               </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (submitting) return;
+                  if (tikTokEnabled) {
+                    setTikTokEnabled(false);
+                    return;
+                  }
+                  if (!tikTokLinked) {
+                    window.location.href = "/api/auth/tiktok";
+                    return;
+                  }
+                  setTikTokEnabled(true);
+                }}
+                className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm transition ${
+                  tikTokEnabled
+                    ? "border-[#1A1A1A] bg-[#EE1D52] text-white"
+                    : "border-[#1A1A1A]/20 bg-white text-[#1A1A1A] hover:bg-black/5"
+                }`}
+                disabled={submitting}
+                title={
+                  !tikTokEnabled && !tikTokLinked
+                    ? "Sign in to TikTok Ads to use this channel"
+                    : undefined
+                }
+              >
+                <Clapperboard size={16} />
+                TikTok
+              </button>
             </div>
 
             <div className="mt-4 overflow-hidden rounded-xl border border-black/10 bg-[#FAF9F6]">
@@ -219,7 +307,7 @@ export function PromoteModal({
               </div>
             </div>
 
-            <div className="mt-5 text-sm text-[#1A1A1A]/70">
+            <div className="mt-5 space-y-2 text-sm text-[#1A1A1A]/70">
               {youtubeEnabled ? (
                 existingYouTubeUrl ? (
                   <div>
@@ -228,75 +316,117 @@ export function PromoteModal({
                 ) : (
                   <div>No YouTube link found. You must paste a YouTube URL.</div>
                 )
-              ) : (
-                <div></div>
-              )}
+              ) : null}
+              {tikTokEnabled ? (
+                <div className="flex items-start gap-2">
+                  <Video className="mt-0.5 shrink-0" size={16} />
+                  <div>
+                    {product.productVideoUrl ? (
+                      <span>
+                        Product video URL detected for TikTok upload-by-URL.
+                      </span>
+                    ) : (
+                      <span className="text-amber-800">
+                        No direct product video (.mp4 / hosted) found on this SKU.
+                        Add a video to the product in Shopify, or extend the parser.
+                      </span>
+                    )}
+                  </div>
+                </div>
+              ) : null}
+              {!youtubeEnabled && !tikTokEnabled ? <div /> : null}
             </div>
           </section>
 
           <section>
-            {youtubeEnabled ? (
+            {youtubeEnabled || tikTokEnabled ? (
               <>
-                <div className="flex items-center justify-between">
-                  <h4 className="font-serif text-base">YouTube Campaign Setup</h4>
+                <div className="mt-1">
+                  <h4 className="font-serif text-base">
+                    {youtubeEnabled && tikTokEnabled
+                      ? "Campaign details"
+                      : youtubeEnabled
+                        ? "YouTube Campaign Setup"
+                        : "TikTok Campaign Setup"}
+                  </h4>
                 </div>
 
-                <div className="mt-3">
-                  <div className="text-sm font-medium">Video Source</div>
-                  <div className="mt-2 flex flex-col gap-2">
-                    <label className="flex items-center gap-2 text-sm">
-                      <input
-                        type="radio"
-                        name="videoMode"
-                        checked={videoMode === "existing"}
-                        onChange={() => setVideoMode("existing")}
-                        disabled={!existingYouTubeUrl || submitting}
-                      />
-                      Use existing YouTube link
-                    </label>
-                    <label className="flex items-center gap-2 text-sm">
-                      <input
-                        type="radio"
-                        name="videoMode"
-                        checked={videoMode === "paste"}
-                        onChange={() => setVideoMode("paste")}
-                        disabled={submitting}
-                      />
-                      Paste YouTube URL
-                    </label>
-                  </div>
+                {youtubeEnabled ? (
+                  <>
+                    <div className="mt-3">
+                      <div className="text-sm font-medium">Video Source</div>
+                      <div className="mt-2 flex flex-col gap-2">
+                        <label className="flex items-center gap-2 text-sm">
+                          <input
+                            type="radio"
+                            name="videoMode"
+                            checked={videoMode === "existing"}
+                            onChange={() => setVideoMode("existing")}
+                            disabled={!existingYouTubeUrl || submitting}
+                          />
+                          Use existing YouTube link
+                        </label>
+                        <label className="flex items-center gap-2 text-sm">
+                          <input
+                            type="radio"
+                            name="videoMode"
+                            checked={videoMode === "paste"}
+                            onChange={() => setVideoMode("paste")}
+                            disabled={submitting}
+                          />
+                          Paste YouTube URL
+                        </label>
+                      </div>
 
-                  <input
-                    type="url"
-                    value={videoMode === "paste" ? pastedVideoUrl : finalVideoUrl}
-                    onChange={(e) => setPastedVideoUrl(e.target.value)}
-                    disabled={submitting || videoMode !== "paste"}
-                    placeholder="https://www.youtube.com/watch?v=VIDEO_ID"
-                    className="mt-3 w-full rounded-lg border border-black/10 bg-white px-3 py-2 text-sm outline-none focus:border-[#7C7EDA]"
-                  />
-                </div>
+                      <input
+                        type="url"
+                        value={
+                          videoMode === "paste" ? pastedVideoUrl : finalVideoUrl
+                        }
+                        onChange={(e) => setPastedVideoUrl(e.target.value)}
+                        disabled={submitting || videoMode !== "paste"}
+                        placeholder="https://www.youtube.com/watch?v=VIDEO_ID"
+                        className="mt-3 w-full rounded-lg border border-black/10 bg-white px-3 py-2 text-sm outline-none focus:border-[#7C7EDA]"
+                      />
+                    </div>
 
-                <div className="mt-4">
-                  <div className="text-sm font-medium">Ad Copy</div>
-                  <div className="mt-2 flex flex-col gap-3">
+                    <div className="mt-4">
+                      <div className="text-sm font-medium">Ad Copy</div>
+                      <div className="mt-2 flex flex-col gap-3">
+                        <input
+                          type="text"
+                          value={headline}
+                          onChange={(e) => setHeadline(e.target.value)}
+                          placeholder="Headline (max 30 chars)"
+                          className="w-full rounded-lg border border-black/10 bg-white px-3 py-2 text-sm outline-none focus:border-[#7C7EDA]"
+                          disabled={submitting}
+                        />
+                        <input
+                          type="text"
+                          value={longHeadline}
+                          onChange={(e) => setLongHeadline(e.target.value)}
+                          placeholder="Long Headline (max 90 chars)"
+                          className="w-full rounded-lg border border-black/10 bg-white px-3 py-2 text-sm outline-none focus:border-[#7C7EDA]"
+                          disabled={submitting}
+                        />
+                      </div>
+                    </div>
+                  </>
+                ) : null}
+
+                {tikTokEnabled ? (
+                  <div className="mt-4">
+                    <div className="text-sm font-medium">TikTok ad text</div>
                     <input
                       type="text"
-                      value={headline}
-                      onChange={(e) => setHeadline(e.target.value)}
-                      placeholder="Headline (max 30 chars)"
-                      className="w-full rounded-lg border border-black/10 bg-white px-3 py-2 text-sm outline-none focus:border-[#7C7EDA]"
-                      disabled={submitting}
-                    />
-                    <input
-                      type="text"
-                      value={longHeadline}
-                      onChange={(e) => setLongHeadline(e.target.value)}
-                      placeholder="Long Headline (max 90 chars)"
-                      className="w-full rounded-lg border border-black/10 bg-white px-3 py-2 text-sm outline-none focus:border-[#7C7EDA]"
+                      value={tikTokAdText}
+                      onChange={(e) => setTikTokAdText(e.target.value)}
+                      placeholder={`Defaults to product title (max 100 chars)`}
+                      className="mt-2 w-full rounded-lg border border-black/10 bg-white px-3 py-2 text-sm outline-none focus:border-[#7C7EDA]"
                       disabled={submitting}
                     />
                   </div>
-                </div>
+                ) : null}
 
                 <div className="mt-4 grid gap-3 sm:grid-cols-2">
                   <div>
@@ -329,7 +459,7 @@ export function PromoteModal({
                   <div className="text-sm font-medium">Targeting</div>
                   <div className="mt-2">
                     <div className="text-xs uppercase tracking-wide text-[#1A1A1A]/60">
-                      Country
+                      Country (ISO region, e.g. US)
                     </div>
                     <input
                       type="text"
@@ -341,42 +471,49 @@ export function PromoteModal({
                     />
                   </div>
 
-                  <div className="mt-3">
-                    <div className="text-xs uppercase tracking-wide text-[#1A1A1A]/60">
-                      Interests
+                  {youtubeEnabled ? (
+                    <div className="mt-3">
+                      <div className="text-xs uppercase tracking-wide text-[#1A1A1A]/60">
+                        Interests
+                      </div>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {interestOptions.map((opt) => {
+                          const checked = interests.includes(opt);
+                          return (
+                            <button
+                              key={opt}
+                              type="button"
+                              onClick={() => {
+                                setInterests((prev) =>
+                                  prev.includes(opt)
+                                    ? prev.filter((x) => x !== opt)
+                                    : [...prev, opt],
+                                );
+                              }}
+                              disabled={submitting}
+                              className={`rounded-full border px-3 py-1.5 text-sm transition ${
+                                checked
+                                  ? "border-[#1A1A1A] bg-[#7C7EDA] text-white"
+                                  : "border-[#1A1A1A]/20 bg-white text-[#1A1A1A] hover:bg-black/5"
+                              }`}
+                            >
+                              {opt}
+                            </button>
+                          );
+                        })}
+                      </div>
                     </div>
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      {interestOptions.map((opt) => {
-                        const checked = interests.includes(opt);
-                        return (
-                          <button
-                            key={opt}
-                            type="button"
-                            onClick={() => {
-                              setInterests((prev) =>
-                                prev.includes(opt)
-                                  ? prev.filter((x) => x !== opt)
-                                  : [...prev, opt],
-                              );
-                            }}
-                            disabled={submitting}
-                            className={`rounded-full border px-3 py-1.5 text-sm transition ${
-                              checked
-                                ? "border-[#1A1A1A] bg-[#7C7EDA] text-white"
-                                : "border-[#1A1A1A]/20 bg-white text-[#1A1A1A] hover:bg-black/5"
-                            }`}
-                          >
-                            {opt}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
+                  ) : null}
                 </div>
               </>
+            ) : metaEnabled ? (
+              <div className="mt-2 text-sm text-[#1A1A1A]/70">
+                Meta uses your ad account credentials from the server environment.
+              </div>
             ) : (
               <div className="mt-2 text-sm text-[#1A1A1A]/70">
-                Enable YouTube above to configure a YouTube video ad.
+                Enable YouTube or TikTok above to configure video ads, or choose
+                Meta.
               </div>
             )}
 

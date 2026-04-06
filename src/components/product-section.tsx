@@ -33,9 +33,10 @@ const itemVariants = {
 
 type Props = {
   connectionId: string;
+  tikTokLinked: boolean;
 };
 
-export function ProductSection({ connectionId }: Props) {
+export function ProductSection({ connectionId, tikTokLinked }: Props) {
   const [products, setProducts] = useState<DisplayProduct[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -54,10 +55,19 @@ export function ProductSection({ connectionId }: Props) {
     interests: string[];
   };
 
+  type TikTokPayload = {
+    dailyBudget: number;
+    durationDays: number;
+    country: string;
+    adText?: string;
+  };
+
   type SubmitInput = {
     meta: boolean;
     youtube: boolean;
+    tikTok: boolean;
     youtubePayload?: YouTubePayload;
+    tiktokPayload?: TikTokPayload;
   };
 
   const load = useCallback(async () => {
@@ -149,6 +159,36 @@ export function ProductSection({ connectionId }: Props) {
       );
     };
 
+    const runTikTok = async () => {
+      const res = await fetch("/api/promote/tiktok", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          product: {
+            id: selectedProduct.id,
+            title: selectedProduct.title,
+            productUrl: selectedProduct.productUrl,
+            slug: selectedProduct.slug,
+            description: selectedProduct.description,
+            productVideoUrl: selectedProduct.productVideoUrl,
+          },
+          tiktokPayload: input.tiktokPayload,
+        }),
+      });
+      const json = (await res.json()) as {
+        error?: string;
+        campaignId?: string;
+        adgroupId?: string;
+        adIds?: string[];
+      };
+      if (!res.ok) {
+        throw new Error(json.error ?? "Failed to promote to TikTok");
+      }
+      messages.push(
+        `TikTok structures created (paused)${json.adgroupId ? ` — ad group ${json.adgroupId}` : ""}.`,
+      );
+    };
+
     try {
       if (input.meta) {
         try {
@@ -168,10 +208,20 @@ export function ProductSection({ connectionId }: Props) {
         }
       }
 
+      if (input.tikTok) {
+        try {
+          await runTikTok();
+        } catch (err) {
+          errors.push(
+            `TikTok: ${err instanceof Error ? err.message : "Unknown error"}`,
+          );
+        }
+      }
+
       setPromoteMsg([...messages, ...errors].join(" "));
 
       // Close the modal only if all selected channels succeeded.
-      const anySelected = input.meta || input.youtube;
+      const anySelected = input.meta || input.youtube || input.tikTok;
       const allSucceeded =
         anySelected && errors.length === 0 && messages.length > 0;
       if (allSucceeded) {
@@ -244,6 +294,10 @@ export function ProductSection({ connectionId }: Props) {
           defaultYouTubeSelected={Boolean(
             selectedProduct.youtubeUrl || selectedProduct.youtubeVideoId,
           )}
+          defaultTikTokSelected={Boolean(
+            selectedProduct.productVideoUrl && tikTokLinked,
+          )}
+          tikTokLinked={tikTokLinked}
           submitting={submitting}
           onClose={() => {
             if (submitting) return;
