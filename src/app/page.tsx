@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { BrandHero } from "@/components/brand-hero";
 import { ProductSection } from "@/components/product-section";
@@ -9,8 +9,20 @@ import { StoreNav } from "@/components/store-nav";
 function HomeContent() {
   const searchParams = useSearchParams();
   const [connectionId, setConnectionId] = useState<string | null>(null);
+  const [tikTokLinked, setTikTokLinked] = useState(false);
+  const [tikTokOAuthBanner, setTikTokOAuthBanner] = useState<string | null>(null);
 
   const workspaceId = process.env.NEXT_PUBLIC_UNIFIED_WORKSPACE_ID;
+
+  const refreshTikTokStatus = useCallback(async () => {
+    try {
+      const r = await fetch("/api/auth/tiktok/status");
+      const j = (await r.json()) as { linked?: boolean };
+      setTikTokLinked(Boolean(j.linked));
+    } catch {
+      setTikTokLinked(false);
+    }
+  }, []);
 
   useEffect(() => {
     const id = searchParams.get("id");
@@ -24,6 +36,25 @@ function HomeContent() {
     setConnectionId(saved ?? "");
   }, [searchParams]);
 
+  useEffect(() => {
+    void refreshTikTokStatus();
+  }, [refreshTikTokStatus, connectionId]);
+
+  useEffect(() => {
+    const linked = searchParams.get("tiktok_linked") === "1";
+    const tikTokErr = searchParams.get("tiktok_error");
+    if (linked) {
+      void refreshTikTokStatus();
+      setTikTokOAuthBanner("TikTok Ads account linked.");
+    }
+    if (tikTokErr) {
+      setTikTokOAuthBanner(`TikTok link failed: ${tikTokErr}`);
+    }
+    if (linked || tikTokErr) {
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+  }, [searchParams, refreshTikTokStatus]);
+
   const startAuth = () => {
     if (!workspaceId) return;
     const redirect = window.location.origin;
@@ -33,12 +64,22 @@ function HomeContent() {
 
   return (
     <div className="min-h-screen bg-[#FAF9F6]">
-      <StoreNav connectionId={connectionId || undefined} />
+      <StoreNav
+        connectionId={connectionId || undefined}
+        tikTokLinked={tikTokLinked}
+      />
+      {tikTokOAuthBanner ? (
+        <p className="border-b border-black/10 bg-[#FAF9F6] px-6 py-2 font-sans text-sm text-[#1A1A1A]/85 md:px-10">
+          {tikTokOAuthBanner}
+        </p>
+      ) : null}
       <BrandHero
         onConnect={startAuth}
         workspaceReady={Boolean(workspaceId)}
       />
-      {connectionId ? <ProductSection connectionId={connectionId} /> : null}
+      {connectionId ? (
+        <ProductSection connectionId={connectionId} tikTokLinked={tikTokLinked} />
+      ) : null}
     </div>
   );
 }
